@@ -1,0 +1,155 @@
+<div class="forms-page">
+  <header class="head">
+    <div class="head-left">
+      <span class="i i-pencil"></span>
+      <h1 class="title">GERANDO FORMULÁRIO</h1>
+    </div>
+
+    <nav class="actions">
+      <button class="icon-btn" (click)="cancel()" aria-label="Ir para a Home" title="Ir para a Home">🏠</button>
+    </nav>
+  </header>
+
+  <div
+    *ngIf="flashMsg"
+    class="flash"
+    [class.flash-success]="flashKind==='success'"
+    [class.flash-info]="flashKind==='info'"
+    [class.flash-danger]="flashKind==='danger'">
+    {{ flashMsg }}
+  </div>
+
+  <section class="card">
+    <div class="block">
+      <label class="label">TÍTULO:</label>
+      <input class="input" type="text" [formControl]="form.controls.title" placeholder="Título do formulário" />
+    </div>
+
+    <!-- 👇 NOVO BLOCO: DESCRIÇÃO DO FORMULÁRIO -->
+    <div class="block">
+      <label class="label">DESCRIÇÃO DO FORMULÁRIO:</label>
+      <textarea
+        class="textarea"
+        rows="3"
+        [formControl]="form.controls.description"
+        placeholder="Explique brevemente para o hóspede o objetivo deste formulário">
+      </textarea>
+    </div>
+  </section>
+
+  <section class="questions">
+    <div cdkDropList class="q-list" (cdkDropListDropped)="drop($event)">
+      <div
+        class="q-card"
+        *ngFor="let q of questions.controls; let i = index; trackBy: trackById"
+        cdkDrag
+        [cdkDragData]="q">
+
+        <div class="q-head">
+          <span class="drag-handle" cdkDragHandle>⋮⋮</span>
+
+          <div class="q-grid">
+            <div class="q-prompt">
+              <label class="label">PERGUNTA:</label>
+              <input class="input" type="text" [formControl]="q.controls.prompt" placeholder="Escreva a pergunta" />
+            </div>
+
+            <div class="q-type">
+              <label class="label">TIPO:</label>
+              <select
+                class="select"
+                [value]="q.controls.type.value"
+                (change)="setType(i, $any($event.target).value)">
+                <option value="sticker">STICKER</option>
+                <option value="slider">BARRA</option>
+                <option value="text">DESCRITIVA</option>
+                <option value="stars">ESTRELAS</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="q-required">
+          <label class="req-card">
+            <input type="checkbox" [formControl]="q.controls.required" />
+            <span>RESPOSTA OBRIGATÓRIA</span>
+          </label>
+        </div>
+
+        <div class="q-preview">
+          <ng-container [ngSwitch]="q.controls.type.value">
+
+            <div *ngSwitchCase="'sticker'" class="sticker-row">
+              <div class="sticker-item">
+                <span class="emo">😫</span>
+                <span class="emo-label">Péssima</span>
+              </div>
+              <div class="sticker-item">
+                <span class="emo">🙁</span>
+                <span class="emo-label">Ruim</span>
+              </div>
+              <div class="sticker-item">
+                <span class="emo">😐</span>
+                <span class="emo-label">Regular</span>
+              </div>
+              <div class="sticker-item">
+                <span class="emo">🙂</span>
+                <span class="emo-label">Boa</span>
+              </div>
+              <div class="sticker-item">
+                <span class="emo">😄</span>
+                <span class="emo-label">Excelente</span>
+              </div>
+            </div>
+
+            <div *ngSwitchCase="'slider'" class="slider-row">
+              <input type="range" min="0" max="10" value="5" class="range" />
+              <div class="scale">
+                <span>0</span><span>10</span>
+              </div>
+            </div>
+
+            <div *ngSwitchCase="'text'" class="text-row">
+              <textarea rows="3" class="textarea" placeholder="Resposta descritiva"></textarea>
+            </div>
+
+            <div *ngSwitchCase="'stars'" class="stars-row">
+              <div class="star-item">
+                <span class="star">★</span>
+                <span class="star-label">Péssima</span>
+              </div>
+              <div class="star-item">
+                <span class="star">★</span>
+                <span class="star-label">Ruim</span>
+              </div>
+              <div class="star-item">
+                <span class="star">★</span>
+                <span class="star-label">Regular</span>
+              </div>
+              <div class="star-item">
+                <span class="star">★</span>
+                <span class="star-label">Boa</span>
+              </div>
+              <div class="star-item">
+                <span class="star">★</span>
+                <span class="star-label">Excelente</span>
+              </div>
+            </div>
+
+          </ng-container>
+
+          <button class="trash" type="button" (click)="removeQuestion(i)" aria-label="Excluir pergunta">🗑️</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="add-wrapper">
+      <button class="add-btn" type="button" (click)="addQuestion()">+</button>
+    </div>
+  </section>
+
+  <div class="actions-row">
+    <button class="btn primary" type="button" (click)="save()">Salvar formulário</button>
+    <button class="btn ghost" type="button" (click)="cancel()">Cancelar</button>
+  </div>
+</div>

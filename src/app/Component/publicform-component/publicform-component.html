@@ -1,0 +1,102 @@
+<header class="pf-header">
+  <div class="head-center">
+    <h1 class="title">QuestIO</h1>
+  </div>
+</header>
+
+<main class="pf-page">
+  <div class="pf-hotel">{{ formTitle }}</div>
+  <div class="pf-form-desc" *ngIf="formDescription">{{ formDescription }}</div>
+
+  <div class="pf-chips" *ngIf="mode==='form'">
+    <button
+      *ngFor="let b of blocks; let i = index"
+      class="chip"
+      [class.done]="i < idx"
+      [class.current]="i === idx"
+      aria-label="passo {{ i + 1 }}">
+    </button>
+  </div>
+
+  <section class="pf-card" *ngIf="mode==='form' && current as b">
+    <div class="pf-card-title">{{ b.title }}</div>
+
+    <ng-container [ngSwitch]="b.type">
+
+      <ul class="pf-sticker" *ngSwitchCase="'sticker'">
+        <li (click)="selectSticker(b.id,1)" [class.on]="answers[b.id]===1">
+          <span>😫</span><small>PÉSSIMA</small>
+        </li>
+        <li (click)="selectSticker(b.id,2)" [class.on]="answers[b.id]===2">
+          <span>☹️</span><small>RUIM</small>
+        </li>
+        <li (click)="selectSticker(b.id,3)" [class.on]="answers[b.id]===3">
+          <span>😐</span><small>REGULAR</small>
+        </li>
+        <li (click)="selectSticker(b.id,4)" [class.on]="answers[b.id]===4">
+          <span>🙂</span><small>BOA</small>
+        </li>
+        <li (click)="selectSticker(b.id,5)" [class.on]="answers[b.id]===5">
+          <span>😄</span><small>EXCELENTE</small>
+        </li>
+      </ul>
+
+      <div class="pf-slider-wrap" *ngSwitchCase="'bar'">
+        <input class="pf-slider" type="range" min="1" max="5" step="1"
+               [value]="answers[b.id] || 3" (input)="onSlider(b.id,$event)"/>
+        <div class="pf-slider-scale">
+          <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+        </div>
+      </div>
+
+      <div class="pf-stars" *ngSwitchCase="'stars'">
+        <button type="button"
+                *ngFor="let s of [1,2,3,4,5]"
+                class="star"
+                [class.on]="(answers[b.id]||0) >= s"
+                (click)="selectStars(b.id, s)"
+                aria-label="estrela {{s}}">
+          ★
+        </button>
+      </div>
+
+      <div *ngSwitchCase="'text'">
+        <textarea class="pf-text" rows="4"
+                  placeholder="Escreva sua resposta..."
+                  (input)="onText(b.id, $any($event.target).value)">{{answers[b.id]||''}}</textarea>
+      </div>
+
+    </ng-container>
+  </section>
+
+  <div class="pf-actions" *ngIf="mode==='form'">
+    <button class="pf-btn" (click)="confirm()">CONFIRMAR</button>
+  </div>
+
+  <div class="pf-error" *ngIf="mode==='form' && requiredError">
+    Por favor, responda esta pergunta antes de avançar.
+  </div>
+
+  <section class="pf-review" *ngIf="mode==='review'">
+    <div class="pf-hotel pf-review-title">{{ hotel }}</div>
+    <ul class="pf-review-list">
+      <li *ngFor="let b of blocks">
+        <span class="tick">✓</span>
+        <span class="lbl">{{ b.title }}</span>
+      </li>
+    </ul>
+    <div class="pf-actions pf-actions-review">
+      <button class="pf-btn" (click)="finish()">FINALIZAR</button>
+    </div>
+  </section>
+
+  <section class="pf-done" *ngIf="mode==='done'">
+    <div class="pf-brand big">{{ brand }}</div>
+    <div class="pf-thanks">
+      <div class="hotel">{{ hotel }}</div>
+      <div class="icon">🏨</div>
+      <div class="msg">AGRADECE A PREFERÊNCIA</div>
+      <div class="foot">PESQUISA RESPONDIDA EM {{ doneAt }}</div>
+    </div>
+  </section>
+</main>

@@ -1,0 +1,179 @@
+<div class="home-page">
+  <header class="topbar">
+  <div class="user-chip">
+    <span class="welcome">Olá {{ username }}</span>
+  </div>
+  <nav class="actions">
+    <button class="btn secondary" type="button" (click)="openUsers()">
+      Cadastro de Usuário
+    </button>
+
+    <button class="icon-btn" (click)="openSettings()" aria-label="Configurações" title="Configurações">
+      <span class="i i-gear"></span>
+    </button>
+  </nav>
+</header>
+
+  <div
+    *ngIf="flashMsg"
+    class="flash"
+    [class.flash-success]="flashKind==='success'"
+    [class.flash-info]="flashKind==='info'"
+    [class.flash-danger]="flashKind==='danger'">
+    {{ flashMsg }}
+  </div>
+
+  <ng-container *ngIf="settingsOpen">
+    <app-component-configuration (closed)="closeSettings()"></app-component-configuration>
+  </ng-container>
+
+  <section class="section">
+    <h2 class="section-title">NOVOS DADOS</h2>
+
+    <div class="templates-layout">
+      <div class="shelf">
+        <button class="tile tile-primary" (click)="onClickNewForm()">
+          <span class="tile-plus">+</span>
+          <span class="tile-title">NOVO FORMULÁRIO</span>
+        </button>
+      </div>
+
+      <button class="tile tile-primary side-action" (click)="onClickNewClient()">
+        <span class="tile-plus">+</span>
+        <span class="tile-title">NOVO HÓSPEDE</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">LOCALIZAR HÓSPEDE</h2>
+
+    <div class="manage-area">
+      <div class="search-card">
+        <div class="search-label">Procure por nome completo do hóspede ou número do quarto</div>
+
+        <div class="search-row">
+          <input
+            class="search-input"
+            type="text"
+            [formControl]="searchCtrl"
+            placeholder="Ex.: Ana Silva ou 203"
+            aria-label="Buscar cliente ou quarto" />
+
+          <button class="btn secondary small" type="button" (click)="listAllClients()">
+            Listar todos
+          </button>
+
+          <button class="btn ghost small" type="button" (click)="clearSearch()">
+            Limpar
+          </button>
+        </div>
+
+        <ul class="results-list" *ngIf="(showAllClients || hasQuery) && filteredClients.length">
+          <li class="result-item" *ngFor="let c of filteredClients" (click)="selectClient(c)">
+            <div class="result-title">
+              <span class="result-avatar">👤</span>
+              <span class="result-name">{{ c.name }}</span>
+              <span class="result-chip">Quarto {{ c.room }}</span>
+            </div>
+            <div class="result-meta">{{ c.email }} • {{ c.phone }}</div>
+
+            <div class="client-actions">
+              <button class="btn pill" (click)="assignToClient(c, $event)">Atribuir</button>
+              <button class="icon-only" title="Editar" (click)="editClient(c, $event)">✎</button>
+              <button class="icon-only" title="Excluir" (click)="deleteClient(c, $event)">🗑️</button>
+            </div>
+
+            <div class="assigned" *ngIf="c.assignedFormId">
+              Atribuído: {{ getTemplateTitleById(c.assignedFormId) }}
+            </div>
+          </li>
+        </ul>
+
+        <div class="no-results" *ngIf="(showAllClients || hasQuery) && !filteredClients.length">
+          Nenhum cliente encontrado.
+        </div>
+      </div>
+
+      <div class="edit-card" *ngIf="selected">
+        <h3 class="edit-title">Editar dados do cliente</h3>
+
+        <form [formGroup]="editForm" class="edit-form" (ngSubmit)="saveEdits()">
+          <label class="field">
+            <span class="field-label">Nome</span>
+            <input class="field-input" type="text" formControlName="name" placeholder="Nome completo" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Quarto</span>
+            <input class="field-input" type="text" formControlName="room" placeholder="Ex.: 305" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">E-mail</span>
+            <input class="field-input" type="email" formControlName="email" placeholder="email@exemplo.com" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Telefone</span>
+            <input class="field-input" type="text" formControlName="phone" placeholder="(11) 90000-0000" />
+          </label>
+
+          <div class="edit-actions">
+            <button type="button" class="btn ghost" (click)="cancelEdit()">Cancelar</button>
+            <button type="submit" class="btn primary">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-title">FORMULÁRIOS EM ABERTO</h2>
+
+    <ng-container *ngIf="hasOpenForms; else emptyState">
+      <div class="open-grid">
+        <article class="open-card" *ngFor="let c of openFormCards">
+          <header class="open-head">
+            <h3 class="open-title">{{ c.title }}</h3>
+          </header>
+
+          <div class="open-actions">
+            <button type="button" class="pill success" (click)="openForm(c)">ACESSAR</button>
+            <button type="button" class="trash-btn" (click)="deleteForm(c)" aria-label="Excluir">🗑️</button>
+          </div>
+        </article>
+      </div>
+    </ng-container>
+
+    <ng-template #emptyState>
+      <div class="empty-state">Nenhum formulário criado ou respondido</div>
+    </ng-template>
+  </section>
+
+  <!-- Modal de atribuição -->
+  <div class="assign-backdrop" *ngIf="assignOpen" (click)="closeAssign()"></div>
+  <div class="assign-modal" *ngIf="assignOpen" role="dialog" aria-modal="true">
+    <header class="assign-head">
+      <div class="assign-title">Atribuir formulário para {{ assignFor?.name }}</div>
+      <button class="assign-close" (click)="closeAssign()" aria-label="Fechar">✕</button>
+    </header>
+
+    <div class="assign-list">
+      <label class="assign-row" *ngFor="let t of availableTemplates">
+        <input
+          type="radio"
+          name="template"
+          [value]="t.id"
+          [(ngModel)]="assignSelectedTemplateId" />
+        <span class="assign-name">{{ t.title }}</span>
+        <span class="assign-meta">Criado em {{ formatDate(t.createdAt) }}</span>
+      </label>
+    </div>
+
+    <footer class="assign-actions">
+      <button class="btn ghost" (click)="closeAssign()">Cancelar</button>
+      <button class="btn primary" [disabled]="!assignSelectedTemplateId" (click)="confirmAssign()">Atribuir</button>
+    </footer>
+  </div>
+</div>
