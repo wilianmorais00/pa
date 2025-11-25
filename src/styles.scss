@@ -1,0 +1,47 @@
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; padding: 0; }
+body { overflow-y: hidden; }
+
+:root {
+  --font-sans: "Roboto", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-sans);
+}
+
+.font-roboto, .font-roboto * {
+  font-family: "Roboto", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+
+.theme-dark {
+  body { background: #23252b; color: #656565; }
+
+  .card,
+  .search-card,
+  .edit-card,
+  .open-card,
+  .assign-modal,
+  .cfg-panel {
+    background: #23252b;
+    border-color: #000000;
+    color: #656565;
+  }
+
+  .tile-primary { filter: brightness(0.95); }
+
+  .input,
+  .field-input,
+  .search-input,
+  select,
+  textarea {
+    background: #23252b;
+    color: #656565;
+    border-color: #000000;
+  }
+
+  .results-list .result-item,
+  .open-card,
+  .section,
+  .section-title {
+    border-color: #000000;
+  }
+  .assign-backdrop { background: #656565; }
+}

@@ -1,0 +1,23 @@
+<div class="cfg-backdrop" (click)="close()"></div>
+
+<section class="cfg-panel" role="dialog" aria-label="Configurações">
+  <header class="cfg-head">
+    <h3 class="cfg-title">Configurações</h3>
+    <button class="icon-btn ghost" (click)="close()" aria-label="Fechar">×</button>
+  </header>
+
+  <div class="cfg-body">
+    <div class="cfg-row">
+      <label class="cfg-label">Tema Escuro</label>
+      <label class="switch">
+        <input type="checkbox" [checked]="isDark" (change)="toggleTheme()" />
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <footer class="cfg-foot">
+    <button class="btn danger" (click)="logout()">Logout</button>
+    <button class="btn ghost" (click)="close()">Fechar</button>
+  </footer>
+</section>

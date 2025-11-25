@@ -1,0 +1,78 @@
+<div class="user-page">
+  <header class="bar">
+    <h1 class="title">
+      <span class="ico">📊</span>
+      PAINEL GERENCIAL DE RESPOSTAS
+    </h1>
+
+    <button class="home-btn" (click)="goHome()" aria-label="Ir para a Home">
+      🏠
+    </button>
+  </header>
+
+  <section class="card meta-card">
+    <div class="meta-head">
+      <h2 class="form-title">
+        Respostas – {{ form?.title }}
+        <span class="form-id">(ID: {{ form?.id }})</span>
+      </h2>
+    </div>
+
+    <div class="meta">
+      <div>Criado em: {{ form?.createdAt | date:'dd/MM/yyyy, HH:mm:ss' }}</div>
+      <div>• Total de respostas: {{ form?.totalAnswers || 0 }}</div>
+      <div>• Última: {{ form?.lastAnswerAt | date:'dd/MM/yyyy, HH:mm:ss' }}</div>
+    </div>
+  </section>
+
+  <section class="card list-card">
+    <h3 class="section-title">PERGUNTAS DO FORMULÁRIO</h3>
+
+    <section
+      class="q-row"
+      *ngFor="let q of questions"
+    >
+      <div class="q-row-head">
+        <div class="q-row-title">{{ q.prompt }}</div>
+        <span class="badge">Tipo: {{ q.type }}</span>
+      </div>
+
+      <div class="q-row-body" [ngSwitch]="q.type">
+        <ul class="scale-list" *ngSwitchCase="'sticker'">
+          <li *ngFor="let i of [0,1,2,3,4]">
+            <span class="emo">{{ emojiOf(i) }}</span>
+            <span class="lbl">{{ labelOf(i) }}</span>
+            <span class="dot">•</span>
+            <span class="qty">{{ (stats[q.id]?.counts?.[i] || 0) }}</span>
+          </li>
+        </ul>
+
+        <ul class="scale-list" *ngSwitchCase="'stars'">
+          <li *ngFor="let i of [0,1,2,3,4]">
+            <span class="emo">★</span>
+            <span class="lbl">{{ labelOf(i) }}</span>
+            <span class="dot">•</span>
+            <span class="qty">{{ (stats[q.id]?.counts?.[i] || 0) }}</span>
+          </li>
+        </ul>
+
+        <div class="avg-row" *ngSwitchCase="'slider'">
+          <div class="avg-label">MÉDIA</div>
+          <div class="avg-value">{{ stats[q.id]?.avg ?? 0 }}</div>
+        </div>
+
+        <div class="texts" *ngSwitchCase="'text'">
+          <div class="texts-title">Últimas respostas</div>
+          <ul class="texts-list" *ngIf="(stats[q.id]?.texts?.length || 0) > 0; else noText">
+            <li *ngFor="let t of stats[q.id]?.texts">{{ t }}</li>
+          </ul>
+          <ng-template #noText>
+            <div class="empty">Nenhuma resposta</div>
+          </ng-template>
+        </div>
+
+        <div class="empty" *ngSwitchDefault>Sem dados</div>
+      </div>
+    </section>
+  </section>
+</div>

@@ -1,0 +1,90 @@
+<div class="user-page">
+  <header class="bar">
+    <h1 class="title">
+      <span class="ico">👤</span>
+      NOVO USUÁRIO
+    </h1>
+    <button class="home-btn" type="button" routerLink="/home" aria-label="Voltar para Home">🏠</button>
+  </header>
+
+  <div *ngIf="flashMsg" class="flash" [class.flash-success]="flashKind==='success'" [class.flash-info]="flashKind==='info'" [class.flash-danger]="flashKind==='danger'">
+    {{ flashMsg }}
+  </div>
+
+  <div class="card">
+    <form class="form-grid" [formGroup]="form" (ngSubmit)="save()">
+      <label class="field">
+        <span class="field-label">NOME COMPLETO:</span>
+        <input class="field-input" type="text" formControlName="name" placeholder="Nome completo" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">FUNÇÃO:</span>
+        <select class="field-input" formControlName="role">
+          <option value="colaborador">Colaborador</option>
+          <option value="gestor">Gestor</option>
+          <option value="admin">Administrador</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">E-MAIL:</span>
+        <input class="field-input" type="email" formControlName="email" placeholder="email@exemplo.com" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">SENHA:</span>
+        <input class="field-input" type="password" formControlName="password" placeholder="••••••" />
+      </label>
+
+      <div class="field-checkbox">
+        <label class="check">
+          <input type="checkbox" formControlName="active" />
+          <span>Ativo</span>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn danger" (click)="clear()">Cancelar</button>
+        <button type="submit" class="btn success" [disabled]="form.invalid">Salvar</button>
+      </div>
+    </form>
+  </div>
+
+  <section class="list-section">
+    <h2 class="section-title">USUÁRIOS CADASTRADOS</h2>
+
+    <ul class="users-list" *ngIf="users().length; else empty">
+      <li class="user-row" *ngFor="let u of users(); trackBy: trackById">
+        <div class="u-main">
+          <span class="avatar">👤</span>
+          <div class="u-info">
+            <div class="u-name">
+              {{ u.name }}
+              <small class="role">• {{ u.role }}</small>
+            </div>
+            <div class="u-meta">{{ u.email }}</div>
+          </div>
+        </div>
+
+        <div class="u-actions">
+          <span class="status" [class.inactive]="!u.active">{{ u.active ? 'Ativo' : 'Inativo' }}</span>
+          <button class="icon-only" title="Editar" (click)="edit(u)">✎</button>
+          <button class="icon-only" title="Remover" (click)="askRemove(u)">🗑️</button>
+        </div>
+
+        <div class="row-confirm" *ngIf="pendingDeleteId() === u.id">
+          <span class="confirm-text">Remover o usuário "<b>{{ u.name }}</b>"?</span>
+          <div class="confirm-actions">
+            <button class="btn ghost small" type="button" (click)="cancelRemove()">Cancelar</button>
+            <button class="btn danger small" type="button" (click)="confirmRemove(u)">Excluir</button>
+          </div>
+        </div>
+      </li>
+    </ul>
+
+    <ng-template #empty>
+      <div class="empty-state">Nenhum usuário cadastrado</div>
+    </ng-template>
+  </section>
+</div>
