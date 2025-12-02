@@ -2,7 +2,8 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { ClientsService } from '../../Service/client-service';
+// Importe a interface Client para garantir a tipagem
+import { ClientsService, Client } from '../../Service/client-service';
 
 @Component({
   selector: 'app-client',
@@ -46,30 +47,40 @@ export class ClientComponent {
 
     const v = this.form.getRawValue();
 
-    const room = (v.room ?? '').trim();
-    const checkin = v.checkin!;
-    const checkout = v.checkout!;
-    const available = this.clientsSvc.isRoomAvailable(room, checkin, checkout);
+    // --- CORREÇÃO 1: Datas ---
+    // O Java usa LocalDateTime, então PRECISA ter o "T" e a hora.
+    // Se o usuário não preencher, mandamos string vazia (mas o Validator vai barrar antes)
+    const checkinFormatado = v.checkin ? `${v.checkin}T14:00:00` : ''; 
+    const checkoutFormatado = v.checkout ? `${v.checkout}T12:00:00` : '';
 
-    if (!available) {
-      this.showBanner('Quarto já direcionado a outro hóspede no período informado.', 'error');
-      return;
-    }
-
-    const newClient = {
-      id: crypto.randomUUID(),
-      name: v.fullName!,
-      email: v.email!,
-      phone: v.phone!,
-      room,
-      checkin,
-      checkout,
+    const newClient: Client = {
+      // --- CORREÇÃO 2: Nome ---
+      // O formulário usa 'fullName', mas o Java/DTO espera 'name'
+      name: v.fullName, 
+      
+      email: v.email,
+      phone: v.phone,
+      room: v.room,
+      
+      // Enviando as datas com a hora colada
+      checkin: checkinFormatado,
+      checkout: checkoutFormatado
     };
 
-    this.clientsSvc.upsert(newClient);
-    this.showBanner(`${v.fullName} cadastrado com sucesso.`, 'success');
+    console.log('Enviando JSON para o Java:', newClient); // <--- OLHE ISSO NO CONSOLE DO NAVEGADOR
 
-    this.form.reset();
+    this.clientsSvc.upsert(newClient).subscribe({
+      next: (clienteSalvo) => {
+        this.showBanner(`${clienteSalvo.name} cadastrado com sucesso!`, 'success');
+        this.form.reset();
+      },
+      error: (err) => {
+        console.error('Erro:', err);
+        // Tenta pegar a mensagem específica que o Spring mandou
+        const msg = err.error?.message || 'Erro de validação (verifique datas ou campos vazios)';
+        this.showBanner(msg, 'error');
+      }
+    });
   }
 
   cancel() {

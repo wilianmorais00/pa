@@ -1,24 +1,42 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, timer, of } from 'rxjs';
+import { switchMap, retry, catchError } from 'rxjs/operators';
 
+// Interface que espelha o RespostaDto do Java
 export interface FormAnswer {
   questionId: string;
   value: string | number;
-  createdAt?: string;
 }
+
+// URL base do Controller de Respostas (RespostaController.java)
+const API_URL = 'http://localhost:8080/respostas';
 
 @Injectable({ providedIn: 'root' })
 export class ResponsesService {
-  private store = new Map<string, BehaviorSubject<FormAnswer[]>>();
+  private http = inject(HttpClient);
 
-  watchResponses(formId: string): Observable<FormAnswer[]> {
-    if (!this.store.has(formId)) this.store.set(formId, new BehaviorSubject<FormAnswer[]>([]));
-    return this.store.get(formId)!.asObservable();
+  // 1. Busca Simples (GET /respostas/form/{id})
+  getResponses(formId: string | number): Observable<FormAnswer[]> {
+    return this.http.get<FormAnswer[]>(`${API_URL}/form/${formId}`);
   }
 
-  addResponse(formId: string, answer: FormAnswer) {
-    if (!this.store.has(formId)) this.store.set(formId, new BehaviorSubject<FormAnswer[]>([]));
-    const subj = this.store.get(formId)!;
-    subj.next([ ...subj.value, { ...answer, createdAt: new Date().toISOString() } ]);
+  // 2. Busca com Atualização Automática (Watch)
+  // Isso faz o gráfico se mexer sozinho quando alguém responde!
+  watchResponses(formId: string | number): Observable<FormAnswer[]> {
+    // Inicia agora (0) e repete a cada 5000ms (5 segundos)
+    return timer(0, 5000).pipe(
+      // A cada "tic" do timer, faz a requisição HTTP
+      switchMap(() => this.getResponses(formId)),
+      
+      // Se a rede falhar, tenta 2 vezes antes de desistir
+      retry(2),
+      
+      // Se der erro mesmo assim, retorna lista vazia para não quebrar a tela
+      catchError(err => {
+        console.error('Erro ao buscar respostas (polling):', err);
+        return of([]); 
+      })
+    );
   }
 }

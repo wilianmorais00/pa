@@ -80,6 +80,7 @@ export class FormsComponent {
 
   trackById = (_: number, group: QuestionFormGroup) => group.controls.id.value;
 
+  // --- CORREÇÃO AQUI NO SAVE ---
   save() {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -88,8 +89,10 @@ export class FormsComponent {
 
     const payload = {
       title: this.form.controls.title.value,
-      description: this.form.controls.description.value, // 👈 passa a descrição
+      description: this.form.controls.description.value || '', // Garante string
       questions: this.questions.controls.map((q, order) => ({
+        // Nota: O ID gerado aqui (uuid) é ignorado pelo backend na criação (o banco gera novos),
+        // mas é útil para o trackBy local.
         id: q.controls.id.value,
         prompt: q.controls.prompt.value,
         type: q.controls.type.value,
@@ -98,8 +101,21 @@ export class FormsComponent {
       }))
     };
 
-    const created = this.formsService.addTemplate(payload);
-    this.showFlash(`Formulário ${created.title} criado e disponível para atribuir a hóspedes.`, 'success');
+    // O método addTemplate agora retorna um Observable, então usamos .subscribe()
+    this.formsService.addTemplate(payload).subscribe({
+      next: (created) => {
+        this.showFlash(`Formulário "${created.title}" criado e disponível para atribuir a hóspedes.`, 'success');
+        
+        // Limpa o formulário após salvar com sucesso
+        this.form.reset();
+        this.questions.clear();
+        this.addQuestion(); // Adiciona uma pergunta em branco para recomeçar
+      },
+      error: (err) => {
+        console.error(err);
+        this.showFlash('Erro ao criar formulário. Tente novamente.', 'danger');
+      }
+    });
   }
 
   cancel() {

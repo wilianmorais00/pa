@@ -1,98 +1,79 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+// Ajuste para a URL do seu Backend Java
+const API_URL = 'http://localhost:8080/forms';
 
 export type QuestionType = 'sticker' | 'slider' | 'text' | 'stars';
 
 export interface FormQuestion {
-  id: string;
+  id?: string;
   prompt: string;
   type: QuestionType;
-  order: number;
+  orderIndex: number;
   required?: boolean;
 }
 
 export interface FormTemplate {
-  id: string;
+  id?: string | number;
   title: string;
   description?: string;
-  createdAt: string;
+  createdAt?: string;
   questions: FormQuestion[];
-  totalAnswers: number;
-  lastAnswerAt: string;
+  totalAnswers?: number;
+  lastAnswerAt?: string;
+  active?: boolean;
 }
-
-const LS_KEY = 'questio.templates';
 
 @Injectable({ providedIn: 'root' })
 export class FormsService {
-  private _templates$ = new BehaviorSubject<FormTemplate[]>(this.load());
-  templates$ = this._templates$.asObservable();
+  private http = inject(HttpClient);
 
-  list(): FormTemplate[] {
-    return this._templates$.value;
+  // LISTAR (GET /forms)
+  list(): Observable<FormTemplate[]> {
+    return this.http.get<FormTemplate[]>(API_URL);
   }
 
-  getById(id: string): FormTemplate | null {
-    return this._templates$.value.find(t => t.id === id) ?? null;
+  // BUSCAR POR ID (GET /forms/{id})
+  getById(id: string | number): Observable<FormTemplate> {
+    return this.http.get<FormTemplate>(`${API_URL}/${id}`);
   }
 
-  addTemplate(input: { title: string; description?: string; questions: FormQuestion[] }): FormTemplate {
-    const t: FormTemplate = {
-      id: this.uuid(),
-      title: input.title.trim(),
-      description: input.description?.trim() ?? '', // 👈 guarda a descrição
-      createdAt: new Date().toISOString(),
-      questions: input.questions ?? [],
-      totalAnswers: 0,
-      lastAnswerAt: new Date().toISOString(),
+  // CRIAR / ADICIONAR (POST /forms)
+  create(form: Partial<FormTemplate>): Observable<FormTemplate> {
+    return this.http.post<FormTemplate>(API_URL, form);
+  }
+
+  // Método auxiliar para manter compatibilidade com seu componente antigo
+  addTemplate(input: { title: string; description?: string; questions: any[] }): Observable<FormTemplate> {
+    const payload: Partial<FormTemplate> = {
+      title: input.title,
+      description: input.description,
+      questions: input.questions.map((q, index) => ({
+        prompt: q.prompt,
+        // CORREÇÃO CRUCIAL AQUI: .toUpperCase()
+        // O Java espera "STICKER", mas o Front usa "sticker". Convertemos aqui.
+        type: q.type.toUpperCase(), 
+        orderIndex: index,
+        required: q.required
+      }))
     };
-    const next = [t, ...this._templates$.value];
-    this._templates$.next(next);
-    this.persist(next);
-    return t;
+    return this.create(payload);
   }
 
-  update(id: string, patch: Partial<FormTemplate>) {
-    const next = this._templates$.value.map(t => (t.id === id ? { ...t, ...patch } : t));
-    this._templates$.next(next);
-    this.persist(next);
+  // DELETAR (DELETE /forms/{id})
+  deleteTemplate(id: string | number): Observable<any> {
+    return this.http.delete(`${API_URL}/${id}`);
   }
 
-  upsert(tmpl: FormTemplate) {
-    const exists = this._templates$.value.some(t => t.id === tmpl.id);
-    const next = exists
-      ? this._templates$.value.map(t => (t.id === tmpl.id ? { ...t, ...tmpl } : t))
-      : [tmpl, ...this._templates$.value];
-    this._templates$.next(next);
-    this.persist(next);
+  // UPDATE (PUT /forms/{id})
+  update(id: string | number, form: Partial<FormTemplate>): Observable<FormTemplate> {
+    return this.http.put<FormTemplate>(`${API_URL}/${id}`, form);
   }
 
-  deleteTemplate(id: string): void {
-    const next = this._templates$.value.filter(t => t.id !== id);
-    this._templates$.next(next);
-    this.persist(next);
-  }
-
-  private load(): FormTemplate[] {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      return raw ? (JSON.parse(raw) as FormTemplate[]) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  private persist(list: FormTemplate[]) {
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify(list));
-    } catch {}
-  }
-
-  private uuid(): string {
-    try {
-      return crypto.randomUUID();
-    } catch {
-      return Math.random().toString(36).slice(2);
-    }
+  // Para compatibilidade
+  get templates$(): Observable<FormTemplate[]> {
+    return this.list();
   }
 }

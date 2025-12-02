@@ -1,25 +1,21 @@
 <div class="home-page">
   <header class="topbar">
-  <div class="user-chip">
-    <span class="welcome">Olá {{ username }}</span>
-  </div>
-  <nav class="actions">
-    <button class="btn secondary" type="button" (click)="openUsers()">
-      Cadastro de Usuário
-    </button>
+    <div class="user-chip">
+      <span class="welcome">Olá {{ username }}</span>
+    </div>
+    <nav class="actions">
+      <button class="btn secondary" type="button" (click)="openUsers()">
+        Cadastro de Usuário
+      </button>
 
-    <button class="icon-btn" (click)="openSettings()" aria-label="Configurações" title="Configurações">
-      <span class="i i-gear"></span>
-    </button>
-  </nav>
-</header>
+      <button class="icon-btn" (click)="openSettings()" aria-label="Configurações" title="Configurações">
+        <span class="i i-gear"></span>
+      </button>
+    </nav>
+  </header>
 
-  <div
-    *ngIf="flashMsg"
-    class="flash"
-    [class.flash-success]="flashKind==='success'"
-    [class.flash-info]="flashKind==='info'"
-    [class.flash-danger]="flashKind==='danger'">
+  <div *ngIf="flashMsg" class="flash" [class.flash-success]="flashKind==='success'"
+    [class.flash-info]="flashKind==='info'" [class.flash-danger]="flashKind==='danger'">
     {{ flashMsg }}
   </div>
 
@@ -53,11 +49,7 @@
         <div class="search-label">Procure por nome completo do hóspede ou número do quarto</div>
 
         <div class="search-row">
-          <input
-            class="search-input"
-            type="text"
-            [formControl]="searchCtrl"
-            placeholder="Ex.: Ana Silva ou 203"
+          <input class="search-input" type="text" [formControl]="searchCtrl" placeholder="Ex.: Ana Silva ou 203"
             aria-label="Buscar cliente ou quarto" />
 
           <button class="btn secondary small" type="button" (click)="listAllClients()">
@@ -84,8 +76,21 @@
               <button class="icon-only" title="Excluir" (click)="deleteClient(c, $event)">🗑️</button>
             </div>
 
-            <div class="assigned" *ngIf="c.assignedFormId">
-              Atribuído: {{ getTemplateTitleById(c.assignedFormId) }}
+            <!-- MODIFICAÇÃO AQUI: Mostra o formulário E o botão de copiar -->
+            <div class="assigned" *ngIf="c.assignedFormId" style="display: flex; align-items: center; gap: 8px;">
+              <span>
+                <strong>Atribuído:</strong> {{ getTemplateTitleById(c.assignedFormId) }}
+              </span>
+              
+              <!-- Botão de Copiar Link (só aparece se tiver linkAcesso, o que geralmente é true se já salvou) -->
+              <button 
+                *ngIf="c.linkAcesso" 
+                class="icon-only" 
+                title="Copiar Link de Acesso"
+                (click)="copiarLink(c.linkAcesso, $event)"
+                style="font-size: 1.1em; background: none; border: none; cursor: pointer;">
+                📋
+              </button>
             </div>
           </li>
         </ul>
@@ -161,11 +166,7 @@
 
     <div class="assign-list">
       <label class="assign-row" *ngFor="let t of availableTemplates">
-        <input
-          type="radio"
-          name="template"
-          [value]="t.id"
-          [(ngModel)]="assignSelectedTemplateId" />
+        <input type="radio" name="template" [value]="t.id" [(ngModel)]="assignSelectedTemplateId" />
         <span class="assign-name">{{ t.title }}</span>
         <span class="assign-meta">Criado em {{ formatDate(t.createdAt) }}</span>
       </label>

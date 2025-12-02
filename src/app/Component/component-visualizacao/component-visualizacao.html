@@ -19,6 +19,7 @@
     </div>
 
     <div class="meta">
+      <!-- Uso do operador ?. para evitar erro se form for null -->
       <div>Criado em: {{ form?.createdAt | date:'dd/MM/yyyy, HH:mm:ss' }}</div>
       <div>• Total de respostas: {{ form?.totalAnswers || 0 }}</div>
       <div>• Última: {{ form?.lastAnswerAt | date:'dd/MM/yyyy, HH:mm:ss' }}</div>
@@ -28,25 +29,27 @@
   <section class="card list-card">
     <h3 class="section-title">PERGUNTAS DO FORMULÁRIO</h3>
 
-    <section
-      class="q-row"
-      *ngFor="let q of questions"
-    >
+    <section class="q-row" *ngFor="let q of questions">
       <div class="q-row-head">
         <div class="q-row-title">{{ q.prompt }}</div>
         <span class="badge">Tipo: {{ q.type }}</span>
       </div>
 
-      <div class="q-row-body" [ngSwitch]="q.type">
+      <!-- CORREÇÃO IMPORTANTE: .toLowerCase() para bater com o Java -->
+      <div class="q-row-body" [ngSwitch]="q.type.toLowerCase()">
+        
+        <!-- STICKER -->
         <ul class="scale-list" *ngSwitchCase="'sticker'">
           <li *ngFor="let i of [0,1,2,3,4]">
             <span class="emo">{{ emojiOf(i) }}</span>
             <span class="lbl">{{ labelOf(i) }}</span>
             <span class="dot">•</span>
+            <!-- Acesso seguro ao stats[q.id] -->
             <span class="qty">{{ (stats[q.id]?.counts?.[i] || 0) }}</span>
           </li>
         </ul>
 
+        <!-- STARS -->
         <ul class="scale-list" *ngSwitchCase="'stars'">
           <li *ngFor="let i of [0,1,2,3,4]">
             <span class="emo">★</span>
@@ -56,11 +59,21 @@
           </li>
         </ul>
 
-        <div class="avg-row" *ngSwitchCase="'slider'">
-          <div class="avg-label">MÉDIA</div>
-          <div class="avg-value">{{ stats[q.id]?.avg ?? 0 }}</div>
-        </div>
+        <!-- SLIDER / BAR (Aceita os dois nomes) -->
+        <ng-container *ngSwitchCase="'slider'">
+            <div class="avg-row">
+                <div class="avg-label">MÉDIA</div>
+                <div class="avg-value">{{ stats[q.id]?.avg ?? 0 }}</div>
+            </div>
+        </ng-container>
+        <ng-container *ngSwitchCase="'bar'">
+            <div class="avg-row">
+                <div class="avg-label">MÉDIA</div>
+                <div class="avg-value">{{ stats[q.id]?.avg ?? 0 }}</div>
+            </div>
+        </ng-container>
 
+        <!-- TEXT -->
         <div class="texts" *ngSwitchCase="'text'">
           <div class="texts-title">Últimas respostas</div>
           <ul class="texts-list" *ngIf="(stats[q.id]?.texts?.length || 0) > 0; else noText">

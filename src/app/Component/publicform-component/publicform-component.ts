@@ -1,15 +1,27 @@
-import { Component, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { FormsService } from '../../Service/forms-service';
+import { ActivatedRoute } from '@angular/router';
+// Importamos o ClientsService para falar com o Java
+import { ClientsService } from '../../Service/client-service';
 
+// --- DEFINIÇÕES LOCAIS (Para não depender de DTOs externos) ---
 type BlockType = 'sticker' | 'bar' | 'stars' | 'text';
 
 interface Block {
   id: string;
   type: BlockType;
   title: string;
-  required: boolean; 
+  required: boolean;
+}
+
+// O que vem do Java
+interface BackendQuestion {
+  id: string;
+  prompt: string;
+  type: string; // Vem como 'STICKER', 'SLIDER', etc.
+  orderIndex: number;
+  required: boolean;
 }
 
 @Component({
@@ -19,63 +31,91 @@ interface Block {
   templateUrl: './publicform-component.html',
   styleUrls: ['./publicform-component.css'],
 })
-export class PublicFormComponent {
+export class PublicFormComponent implements OnInit {
+  // Injeções
+  private route = inject(ActivatedRoute);
+  private clientsSvc = inject(ClientsService);
+
   brand = 'QuestIO';
-  hotel = new URLSearchParams(location.search).get('hotel') ?? 'HOTEL AB';
+  hotel = 'Carregando...'; // Título provisório
   formTitle = '';
   formDescription = '';
 
-  private formsSvc = inject(FormsService);
-
+  hospedeId: string | null = null;
   blocks: Block[] = [];
   answers: Record<string, any> = {};
 
-  mode: 'form' | 'review' | 'done' = 'form';
+  mode: 'loading' | 'error' | 'form' | 'review' | 'done' = 'loading';
   idx = 0;
   doneAt = '';
   requiredError = false;
+  errorMessage = '';
 
-  constructor() {
-    const params = new URLSearchParams(location.search);
-    const id = params.get('id');
-    const qParam = params.get('q');
-
-    if (id) {
-      const tpl = this.formsSvc.getById(id);
-      if (tpl) {
-        this.formTitle = tpl.title || this.hotel;
-        this.formDescription = tpl.description || '';
-        this.blocks = (tpl.questions || []).map(q => ({
-          id: q.id,
-          type: (q.type === 'slider' ? 'bar' : q.type) as BlockType,
-          title: q.prompt || 'COMO VOCÊ AVALIA SUA ESTADIA',
-          required: !!q.required, 
-        }));
+  // Substituímos o constructor pelo ngOnInit para usar rotas do Angular corretamente
+  ngOnInit() {
+    this.route.queryParams.subscribe(params => {
+      this.hospedeId = params['id'];
+      
+      if (this.hospedeId) {
+        this.carregarDadosDoJava(this.hospedeId);
+      } else {
+        this.mostrarErro('Link inválido. ID não encontrado.');
       }
-    }
+    });
+  }
 
-    if (!this.formTitle) {
-      this.formTitle = this.hotel;
-    }
+  carregarDadosDoJava(id: string) {
+    this.clientsSvc.getPublicForm(id).subscribe({
+      next: (form: any) => {
+        this.hotel = form.title || 'HOTEL AB';
+        this.formTitle = form.title;
+        this.formDescription = form.description || '';
 
-    if (this.blocks.length === 0) {
-      const queryQ = (qParam ?? 'sticker,bar,stars,text,sticker')
-        .split(',')
-        .map(s => s.trim().toLowerCase())
-        .filter(Boolean) as BlockType[];
+        // Mapeia do formato Java para o formato do seu Componente (Block)
+        this.blocks = (form.questions || [])
+          .sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+          .map((q: BackendQuestion) => {
+            // Converte tipos do Java (UPPERCASE) para o seu front (lowercase)
+            let tipoVisual: BlockType = 'sticker';
+            const tipoJava = q.type.toUpperCase();
 
-      this.blocks = queryQ.map((t, i) => ({
-        id: `q${i + 1}`,
-        type: (['sticker', 'bar', 'stars', 'text'].includes(t) ? t : 'sticker') as BlockType,
-        title: 'COMO VOCÊ AVALIA SUA ESTADIA',
-        required: false, 
-      }));
-    }
+            if (tipoJava === 'SLIDER') tipoVisual = 'bar';
+            else if (tipoJava === 'TEXT') tipoVisual = 'text';
+            else if (tipoJava === 'STARS') tipoVisual = 'stars';
+            else tipoVisual = 'sticker';
+
+            return {
+              id: q.id,
+              type: tipoVisual,
+              title: q.prompt || 'PERGUNTA SEM TÍTULO',
+              required: q.required
+            };
+          });
+
+        if (this.blocks.length > 0) {
+          this.mode = 'form';
+        } else {
+          this.mostrarErro('Formulário sem perguntas.');
+        }
+      },
+      error: (err) => {
+        console.error(err);
+        const msg = err.error?.message || err.error || 'Erro ao carregar formulário.';
+        this.mostrarErro(msg);
+      }
+    });
+  }
+
+  mostrarErro(msg: string) {
+    this.mode = 'error';
+    this.errorMessage = msg;
   }
 
   get current(): Block | null {
     return this.mode === 'form' ? this.blocks[this.idx] ?? null : null;
   }
+
+  // --- SEUS MÉTODOS ORIGINAIS (Mantidos Iguais) ---
 
   selectSticker(qid: string, v: 1 | 2 | 3 | 4 | 5) { this.answers[qid] = v; }
   selectStars(qid: string, v: number) { this.answers[qid] = v; }
@@ -107,13 +147,33 @@ export class PublicFormComponent {
     }
   }
 
+  // --- ADAPTAÇÃO NO FINISH (Enviar para o Java) ---
+  
   finish() {
-    const d = new Date();
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yyyy = d.getFullYear();
-    this.doneAt = `${dd}/${mm}/${yyyy}`;
-    this.mode = 'done';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!this.hospedeId) return;
+
+    // Prepara o array para o Java
+    const payload = Object.keys(this.answers).map(key => ({
+      questionId: key,
+      value: String(this.answers[key]) // Converte tudo pra string pro Java não reclamar
+    }));
+
+    // Envia e mostra a tela de sucesso
+    this.clientsSvc.sendAnswers(this.hospedeId, payload).subscribe({
+      next: () => {
+        const d = new Date();
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        this.doneAt = `${dd}/${mm}/${yyyy}`;
+        
+        this.mode = 'done'; // Tela de agradecimento original
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      },
+      error: (err) => {
+        console.error(err);
+        alert('Erro ao enviar. Tente novamente.');
+      }
+    });
   }
 }

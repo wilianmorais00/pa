@@ -1,90 +1,96 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
 
-export interface Client {
+// Definição das URLs
+const BASE_URL = 'http://localhost:8080';
+const API_URL = `${BASE_URL}/hospede`; 
+
+// --- Interfaces para o Formulário Público ---
+export interface FormQuestion {
   id: string;
+  prompt: string;
+  type: 'STICKER' | 'SLIDER' | 'TEXT' | 'STARS';
+  orderIndex: number;
+  required: boolean;
+}
+
+export interface PublicForm {
+  title: string;
+  description?: string;
+  questions: FormQuestion[];
+}
+
+export interface AnswerDto {
+  questionId: string;
+  value: string;
+}
+
+// --- Interface do Hóspede ---
+export interface Client {
+  id?: string;
   name: string;
   email: string;
   phone: string;
   room: string;
-  checkin: string;   
-  checkout: string; 
-  assignedFormId?: string | null;
+  checkin?: string;
+  checkout?: string;
+  
+  // Link gerado pelo Java (para o botão Copiar)
+  linkAcesso?: string;
+  
+  // ID do formulário atribuído (Vem do Java como número/Long)
+  assignedFormId?: number | null; 
 }
-
-const LS_KEY = 'questio.clients';
 
 @Injectable({ providedIn: 'root' })
 export class ClientsService {
-  private _clients$ = new BehaviorSubject<Client[]>(this.read());
-  clients$ = this._clients$.asObservable();
+  private http = inject(HttpClient);
 
-  list(): Client[] {
-    return this._clients$.value.slice();
+  // --- MÉTODOS DE HÓSPEDES (CRUD) ---
+
+  // LISTAR
+  list(): Observable<Client[]> {
+    return this.http.get<Client[]>(`${API_URL}/listar`);
   }
 
-  upsert(c: Client) {
-    const list = this.list();
-    const idx = list.findIndex(x => x.id === c.id);
-    if (idx >= 0) list[idx] = c;
-    else list.push(c);
-    this.persist(list);
-  }
-
-  remove(id: string) {
-    const list = this.list().filter(x => x.id !== id);
-    this.persist(list);
-  }
-
-  assignToForm(clientId: string, templateId: string): boolean {
-    const list = this.list();
-    const idx = list.findIndex(x => x.id === clientId);
-    if (idx < 0) return false;
-
-    if (list[idx].assignedFormId === templateId) return false;
-
-    list[idx] = { ...list[idx], assignedFormId: templateId };
-    this.persist(list);
-    return true;
-  }
-
-  unassignForm(clientId: string): boolean {
-    const list = this.list();
-    const idx = list.findIndex(x => x.id === clientId);
-    if (idx < 0) return false;
-
-    if (!list[idx].assignedFormId) return false; 
-    list[idx] = { ...list[idx], assignedFormId: null };
-    this.persist(list);
-    return true;
-  }
-
-  isRoomAvailable(room: string, startISO: string, endISO: string, ignoreClientId?: string): boolean {
-    const start = new Date(startISO).getTime();
-    const end = new Date(endISO).getTime();
-    if (isNaN(start) || isNaN(end) || start > end) return false;
-
-    const sameRoom = this.list().filter(c => c.room.trim().toLowerCase() === room.trim().toLowerCase());
-    for (const c of sameRoom) {
-      if (ignoreClientId && c.id === ignoreClientId) continue;
-      const cStart = new Date(c.checkin).getTime();
-      const cEnd = new Date(c.checkout).getTime();
-      const overlap = start <= cEnd && end >= cStart;
-      if (overlap) return false;
+  // SALVAR / EDITAR
+  upsert(client: Client): Observable<Client> {
+    // Se tiver ID, usa rota de edição
+    if (client.id) {
+       return this.http.post<Client>(`${API_URL}/editar/${client.id}`, client);
     }
-    return true;
+    return this.http.post<Client>(`${API_URL}/salvar`, client);
   }
 
-  private read(): Client[] {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      return raw ? JSON.parse(raw) as Client[] : [];
-    } catch {
-      return [];
-    }
+  // REMOVER
+  remove(id: string): Observable<any> {
+    return this.http.post(`${API_URL}/apagar/${id}`, {}, { responseType: 'text' });
   }
-  private persist(list: Client[]) {
-    localStorage.setItem(LS_KEY, JSON.stringify(list));
-    this._clients$.next(list);
+
+  // --- LÓGICA DE ATRIBUIÇÃO ---
+
+  // Atribui um formulário ao hóspede
+  assignToForm(clientId: string, templateId: string | number): Observable<void> {
+    // Chama a rota: PATCH /hospede/{id}/atribuir/{formId}
+    return this.http.patch<void>(`${API_URL}/${clientId}/atribuir/${templateId}`, {});
+  }
+
+  // Desvincula o formulário
+  unassignForm(clientId: string): Observable<void> {
+    return this.http.patch<void>(`${API_URL}/${clientId}/desatribuir`, {});
+  }
+
+  // --- MÉTODOS DO FORMULÁRIO PÚBLICO (NOVO) ---
+
+  // 1. Busca as perguntas para o hóspede responder
+  getPublicForm(hospedeId: string): Observable<PublicForm> {
+    return this.http.get<PublicForm>(`${API_URL}/public/${hospedeId}`);
+  }
+
+  // 2. Envia as respostas para o backend
+  sendAnswers(hospedeId: string, answers: AnswerDto[]): Observable<any> {
+    // Nota: O controller de respostas fica em /respostas, não /hospede
+    return this.http.post(`${BASE_URL}/respostas/enviar/${hospedeId}`, answers);
   }
 }

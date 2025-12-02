@@ -7,4 +7,6 @@ export interface Client {
   checkin: string;  
   checkout: string;  
   assignedFormId?: string | null; 
+
+  linkAcesso?: string;
 }
