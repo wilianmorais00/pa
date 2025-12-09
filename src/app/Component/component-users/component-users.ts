@@ -1,42 +1,57 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, Validators, FormControl } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { UsersService, AppUser } from '../../Service/user-service';
+import { UsersService, AppUser } from '../../Service/user-service'; // Ajuste o caminho se precisar
 
 @Component({
   selector: 'app-users',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './component-users.html',
-  styleUrls: ['./component-users.css']
+  styleUrls: ['./component-users.css'] // Se tiver CSS
 })
-export class UsersComponent {
+export class UsersComponent implements OnInit {
   private fb = inject(FormBuilder);
   private usersSvc = inject(UsersService);
 
-  users = signal<AppUser[]>(this.usersSvc.list());
+  // Lista de usuários vinda da API
+  users: AppUser[] = [];
 
+  // Controle de mensagens (Flash Messages)
   flashMsg: string | null = null;
   flashKind: 'success' | 'info' | 'danger' = 'success';
-  private flashTimer: any;
-  private showFlash(msg: string, kind: 'success' | 'info' | 'danger' = 'success') {
-    this.flashMsg = msg;
-    this.flashKind = kind;
-    if (this.flashTimer) clearTimeout(this.flashTimer);
-    this.flashTimer = setTimeout(() => (this.flashMsg = null), 3000);
-  }
 
-  pendingDeleteId = signal<string | null>(null);
+  // Controle de deleção
+  pendingDeleteId = new FormControl<string | null>(null);
 
-  form = this.fb.nonNullable.group({
+  // Formulário
+  form = this.fb.group({
     id: [''],
     name: ['', [Validators.required, Validators.minLength(2)]],
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(4)]],
-    role: ['colaborador', [Validators.required]],
+    role: ['USER', [Validators.required]], // Valor padrão compatível com Java
     active: [true]
   });
+
+  ngOnInit(): void {
+    this.refresh();
+  }
+
+  // Busca dados no Backend
+  refresh() {
+    this.usersSvc.list().subscribe({
+      next: (data) => {
+        this.users = data;
+        console.log('Usuários carregados:', data);
+      },
+      error: (err) => {
+        console.error(err);
+        this.showFlash('Erro ao carregar usuários.', 'danger');
+      }
+    });
+  }
 
   save() {
     if (this.form.invalid) {
@@ -45,38 +60,76 @@ export class UsersComponent {
     }
 
     const raw = this.form.getRawValue();
-    const value = {
-      id: raw.id,
-      name: raw.name,
-      email: raw.email,
-      password: raw.password,
-      role: raw.role as AppUser['role'],
-      active: raw.active as boolean
+    const isEditing = !!raw.id;
+
+    // Objeto pronto para enviar
+    const userPayload: AppUser = {
+      id: raw.id || undefined,
+      name: raw.name || '',
+      email: raw.email || '',
+      password: raw.password || '',
+      role: raw.role || 'USER',
+      active: raw.active === true
     };
 
-    if (!value.id) {
-      this.usersSvc.create({
-        name: value.name,
-        email: value.email,
-        password: value.password,
-        role: value.role,
-        active: value.active
-      });
-      this.showFlash('Usuário cadastrado com sucesso.', 'success');
+    // Decide se é CREATE ou UPDATE
+    let obs$;
+    if (isEditing) {
+      // OBS: Isso vai falhar até você criar o @PutMapping no Java
+      obs$ = this.usersSvc.update(userPayload);
     } else {
-      this.usersSvc.update({
-        id: value.id,
-        name: value.name,
-        email: value.email,
-        password: value.password,
-        role: value.role,
-        active: value.active
-      });
-      this.showFlash('Usuário atualizado com sucesso.', 'info');
+      obs$ = this.usersSvc.create(userPayload);
     }
 
-    this.refresh();
-    this.clear();
+    obs$.subscribe({
+      next: () => {
+        this.showFlash(`Usuário ${isEditing ? 'editado' : 'criado'} com sucesso!`, 'success');
+        this.clear();
+        this.refresh();
+      },
+      error: (err) => {
+        console.error(err);
+        // Tenta pegar a mensagem de erro que vem do Java (ResponseEntity)
+        const msg = err.error || 'Erro ao salvar.';
+        this.showFlash(msg, 'danger');
+      }
+    });
+  }
+
+  edit(u: AppUser) {
+    this.form.patchValue({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      password: '', // Não preenchemos a senha por segurança
+      role: u.role,
+      active: u.active
+    });
+    // Ao editar, senha pode ser opcional (depende da sua lógica, por enquanto deixei obrigatória no form)
+  }
+
+  askRemove(u: AppUser) {
+    if (u.id) this.pendingDeleteId.setValue(u.id);
+  }
+
+  cancelRemove() {
+    this.pendingDeleteId.setValue(null);
+  }
+
+  confirmRemove(u: AppUser) {
+    if (!u.id) return;
+
+    this.usersSvc.remove(u.id).subscribe({
+      next: () => {
+        this.showFlash('Usuário removido.', 'success');
+        this.pendingDeleteId.setValue(null);
+        this.refresh();
+      },
+      error: (err) => {
+        console.error(err);
+        this.showFlash('Erro ao remover usuário.', 'danger');
+      }
+    });
   }
 
   clear() {
@@ -85,43 +138,19 @@ export class UsersComponent {
       name: '',
       email: '',
       password: '',
-      role: 'colaborador',
+      role: 'USER',
       active: true
     });
+    this.pendingDeleteId.setValue(null);
   }
 
-  edit(u: AppUser) {
-    this.form.setValue({
-      id: u.id ?? '',
-      name: u.name,
-      email: u.email,
-      password: u.password ?? '',
-      role: u.role,
-      active: !!u.active
-    });
+  private showFlash(msg: string, kind: 'success' | 'info' | 'danger') {
+    this.flashMsg = msg;
+    this.flashKind = kind;
+    setTimeout(() => this.flashMsg = null, 4000);
   }
 
-  askRemove(u: AppUser) {
-    if (!u.id) return;
-    this.pendingDeleteId.set(u.id);
-  }
-
-  cancelRemove() {
-    this.pendingDeleteId.set(null);
-  }
-
-  confirmRemove(u: AppUser) {
-    if (!u.id) return;
-    this.usersSvc.remove(u.id);
-    this.refresh();
-    if (this.form.value.id === u.id) this.clear();
-    this.pendingDeleteId.set(null);
-    this.showFlash(`Usuário "${u.name}" removido.`, 'danger');
-  }
-
-  trackById = (_: number, u: AppUser) => u.id ?? '';
-
-  private refresh() {
-    this.users.set(this.usersSvc.list());
+  trackById(index: number, item: AppUser) {
+    return item.id;
   }
 }

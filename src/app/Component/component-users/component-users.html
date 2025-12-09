@@ -21,9 +21,8 @@
       <label class="field">
         <span class="field-label">FUNÇÃO:</span>
         <select class="field-input" formControlName="role">
-          <option value="colaborador">Colaborador</option>
-          <option value="gestor">Gestor</option>
-          <option value="admin">Administrador</option>
+          <option value="USER">Colaborador / Usuário</option>
+          <option value="ADMIN">Administrador</option>
         </select>
       </label>
 
@@ -54,8 +53,9 @@
   <section class="list-section">
     <h2 class="section-title">USUÁRIOS CADASTRADOS</h2>
 
-    <ul class="users-list" *ngIf="users().length; else empty">
-      <li class="user-row" *ngFor="let u of users(); trackBy: trackById">
+    <ul class="users-list" *ngIf="users.length; else empty">
+      
+      <li class="user-row" *ngFor="let u of users; trackBy: trackById">
         <div class="u-main">
           <span class="avatar">👤</span>
           <div class="u-info">
@@ -73,7 +73,7 @@
           <button class="icon-only" title="Remover" (click)="askRemove(u)">🗑️</button>
         </div>
 
-        <div class="row-confirm" *ngIf="pendingDeleteId() === u.id">
+        <div class="row-confirm" *ngIf="pendingDeleteId.value === u.id">
           <span class="confirm-text">Remover o usuário "<b>{{ u.name }}</b>"?</span>
           <div class="confirm-actions">
             <button class="btn ghost small" type="button" (click)="cancelRemove()">Cancelar</button>
