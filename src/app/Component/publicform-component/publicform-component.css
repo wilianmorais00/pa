@@ -122,3 +122,50 @@
 .pf-thanks .icon{font-size:72px;line-height:1}
 .pf-thanks .msg{font-weight:800;color:#0b2133}
 .pf-thanks .foot{margin-top:28px;font-size:11px;color:#536474;text-align:center}
+
+
+/* =========================================================
+   AQUI ENTRA SÓ O AJUSTE DE MOBILE (SEM MEXER NO RESTO)
+   ========================================================= */
+@media (max-width: 768px) {
+  
+  /* 1. Evita que o card saia da tela */
+  .pf-card, .pf-review {
+    width: 100%; 
+    box-sizing: border-box; /* Garante que o padding fique DENTRO da largura */
+  }
+
+  /* 2. Ajuste dos Stickers (Emojis) para não quebrar */
+  .pf-sticker {
+    gap: 4px; /* Diminui o espaço entre eles */
+  }
+  
+  .pf-sticker li {
+    padding: 8px 2px; /* Diminui a borda interna */
+  }
+
+  .pf-sticker span {
+    font-size: 20px; /* Emojis um pouco menores */
+  }
+  
+  .pf-sticker small {
+    font-size: 8px; /* Texto menor */
+  }
+
+  /* 3. Botões fáceis de clicar */
+  .pf-btn {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    box-sizing: border-box;
+  }
+  
+  .pf-actions {
+    width: 100%;
+  }
+
+  /* 4. Evitar zoom no iPhone */
+  .pf-text {
+    font-size: 16px; 
+  }
+}

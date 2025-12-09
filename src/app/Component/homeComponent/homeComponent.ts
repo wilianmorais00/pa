@@ -180,19 +180,21 @@ export class HomeComponent implements OnInit, OnDestroy {
   confirmAssign() {
     if (!this.assignFor || !this.assignSelectedTemplateId) return;
 
+    // Verifica se já não é o mesmo formulário (Convertendo ambos para string para comparar)
     if (String(this.assignFor.assignedFormId) === String(this.assignSelectedTemplateId)) {
-      // Ajustado para buscar na lista local openFormCards
       const t = this.openFormCards.find(x => String(x.id) === String(this.assignSelectedTemplateId));
       this.showFlash(`Hóspede já possui o formulário ${t?.title ?? ''}.`, 'info');
       return;
     }
 
-    this.clientsSvc.assignToForm(this.assignFor.id!, this.assignSelectedTemplateId).subscribe({
+    // --- CORREÇÃO AQUI ---
+    // Usamos Number() para converter a string do select em número para o Java
+    this.clientsSvc.assignToForm(this.assignFor.id!, Number(this.assignSelectedTemplateId)).subscribe({
       next: () => {
         const tpl = this.openFormCards.find(x => String(x.id) === String(this.assignSelectedTemplateId));
         this.showFlash(`Formulário ${tpl?.title ?? ''} atribuído com sucesso!`, 'success');
         this.closeAssign();
-        this.carregarHospedes();
+        this.carregarHospedes(); // Recarrega a lista para mostrar o vínculo novo
       },
       error: (err) => {
         console.error(err);

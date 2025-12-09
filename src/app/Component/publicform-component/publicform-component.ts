@@ -2,10 +2,9 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-// Importamos o ClientsService para falar com o Java
 import { ClientsService } from '../../Service/client-service';
 
-// --- DEFINIÇÕES LOCAIS (Para não depender de DTOs externos) ---
+// --- TIPOS LOCAIS ---
 type BlockType = 'sticker' | 'bar' | 'stars' | 'text';
 
 interface Block {
@@ -15,11 +14,11 @@ interface Block {
   required: boolean;
 }
 
-// O que vem do Java
+// O que vem do Java (DTO em Inglês)
 interface BackendQuestion {
   id: string;
   prompt: string;
-  type: string; // Vem como 'STICKER', 'SLIDER', etc.
+  type: string;
   orderIndex: number;
   required: boolean;
 }
@@ -32,17 +31,18 @@ interface BackendQuestion {
   styleUrls: ['./publicform-component.css'],
 })
 export class PublicFormComponent implements OnInit {
-  // Injeções
   private route = inject(ActivatedRoute);
   private clientsSvc = inject(ClientsService);
 
   brand = 'QuestIO';
-  hotel = 'Carregando...'; // Título provisório
+  hotel = 'Carregando...';
   formTitle = '';
   formDescription = '';
 
   hospedeId: string | null = null;
   blocks: Block[] = [];
+  
+  // Guarda as respostas: { "ID_PERGUNTA": "VALOR" }
   answers: Record<string, any> = {};
 
   mode: 'loading' | 'error' | 'form' | 'review' | 'done' = 'loading';
@@ -51,35 +51,37 @@ export class PublicFormComponent implements OnInit {
   requiredError = false;
   errorMessage = '';
 
-  // Substituímos o constructor pelo ngOnInit para usar rotas do Angular corretamente
   ngOnInit() {
-    this.route.queryParams.subscribe(params => {
+    // CORREÇÃO CRÍTICA: Usamos 'params' porque a rota é 'responder/:id'
+    this.route.params.subscribe(params => {
       this.hospedeId = params['id'];
       
       if (this.hospedeId) {
         this.carregarDadosDoJava(this.hospedeId);
       } else {
-        this.mostrarErro('Link inválido. ID não encontrado.');
+        this.mostrarErro('Link inválido. ID não encontrado na URL.');
       }
     });
   }
 
   carregarDadosDoJava(id: string) {
+    // Garante que começa carregando
+    this.mode = 'loading';
+
     this.clientsSvc.getPublicForm(id).subscribe({
       next: (form: any) => {
-        this.hotel = form.title || 'HOTEL AB';
+        // --- SUCESSO ---
+        this.hotel = form.title || 'HOTEL PARCEIRO';
         this.formTitle = form.title;
         this.formDescription = form.description || '';
 
-        // Mapeia do formato Java para o formato do seu Componente (Block)
         this.blocks = (form.questions || [])
           .sort((a: any, b: any) => a.orderIndex - b.orderIndex)
           .map((q: BackendQuestion) => {
-            // Converte tipos do Java (UPPERCASE) para o seu front (lowercase)
             let tipoVisual: BlockType = 'sticker';
-            const tipoJava = q.type.toUpperCase();
+            const tipoJava = q.type ? q.type.toUpperCase() : 'TEXT';
 
-            if (tipoJava === 'SLIDER') tipoVisual = 'bar';
+            if (tipoJava === 'SLIDER' || tipoJava === 'BAR') tipoVisual = 'bar';
             else if (tipoJava === 'TEXT') tipoVisual = 'text';
             else if (tipoJava === 'STARS') tipoVisual = 'stars';
             else tipoVisual = 'sticker';
@@ -87,20 +89,34 @@ export class PublicFormComponent implements OnInit {
             return {
               id: q.id,
               type: tipoVisual,
-              title: q.prompt || 'PERGUNTA SEM TÍTULO',
+              title: q.prompt || 'Pergunta',
               required: q.required
             };
           });
 
         if (this.blocks.length > 0) {
+          // Muda de 'loading' para 'form'
           this.mode = 'form';
         } else {
           this.mostrarErro('Formulário sem perguntas.');
         }
       },
       error: (err) => {
-        console.error(err);
-        const msg = err.error?.message || err.error || 'Erro ao carregar formulário.';
+        console.error('Erro ao carregar:', err);
+
+        // --- CORREÇÃO DEFINITIVA ---
+        // Se o status for 400, é porque o Java bloqueou (Já respondido).
+        // Mudamos o modo para 'done' IMEDIATAMENTE.
+        if (err.status === 400) {
+           this.mode = 'done'; 
+           this.doneAt = 'Anteriormente';
+           this.hotel = 'Pesquisa Finalizada'; // Título genérico para a tela de done
+           return; // Para a execução aqui
+        }
+
+        // Se não for 400, é erro de verdade (404, 500, sem net)
+        // Mudamos o modo para 'error'
+        const msg = err.error?.message || 'Link inválido ou expirado.';
         this.mostrarErro(msg);
       }
     });
@@ -115,24 +131,22 @@ export class PublicFormComponent implements OnInit {
     return this.mode === 'form' ? this.blocks[this.idx] ?? null : null;
   }
 
-  // --- SEUS MÉTODOS ORIGINAIS (Mantidos Iguais) ---
-
-  selectSticker(qid: string, v: 1 | 2 | 3 | 4 | 5) { this.answers[qid] = v; }
+  // --- INTERAÇÕES (Sticker, Stars, etc) ---
+  selectSticker(qid: string, v: number) { this.answers[qid] = v; }
   selectStars(qid: string, v: number) { this.answers[qid] = v; }
   onSlider(qid: string, ev: Event) { this.answers[qid] = +(ev.target as HTMLInputElement).value; }
   onText(qid: string, v: string) { this.answers[qid] = v; }
 
+  // --- NAVEGAÇÃO ---
   confirm() {
     const b = this.blocks[this.idx];
     if (!b) return;
+
     if (b.required) {
       const v = this.answers[b.id];
-      const temResposta =
-        v !== undefined &&
-        v !== null &&
-        !(typeof v === 'string' && v.trim() === '') &&
-        !(typeof v === 'number' && isNaN(v));
-
+      // Validação básica: não pode ser null, undefined, nem string vazia
+      const temResposta = (v !== undefined && v !== null && String(v).trim() !== '');
+      
       this.requiredError = !temResposta;
       if (this.requiredError) return;
     } else {
@@ -147,32 +161,33 @@ export class PublicFormComponent implements OnInit {
     }
   }
 
-  // --- ADAPTAÇÃO NO FINISH (Enviar para o Java) ---
-  
+  // --- ENVIO ---
   finish() {
+    // 1. Verifica se existe ID
     if (!this.hospedeId) return;
 
-    // Prepara o array para o Java
+    // 2. TRUQUE DO TYPESCRIPT:
+    // Jogamos numa constante. Como passou pelo if acima, o TS sabe que 'guestId' é string (não null).
+    const guestId = this.hospedeId; 
+
+    // 3. Monta o Payload usando a variável local 'guestId'
     const payload = Object.keys(this.answers).map(key => ({
+      guestId: guestId, // <--- Aqui estava o erro, agora usa a const segura
       questionId: key,
-      value: String(this.answers[key]) // Converte tudo pra string pro Java não reclamar
+      value: String(this.answers[key])
     }));
 
-    // Envia e mostra a tela de sucesso
-    this.clientsSvc.sendAnswers(this.hospedeId, payload).subscribe({
+    this.clientsSvc.sendAnswers(payload).subscribe({
       next: () => {
         const d = new Date();
-        const dd = String(d.getDate()).padStart(2, '0');
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const yyyy = d.getFullYear();
-        this.doneAt = `${dd}/${mm}/${yyyy}`;
+        this.doneAt = d.toLocaleDateString('pt-BR');
         
-        this.mode = 'done'; // Tela de agradecimento original
+        this.mode = 'done';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       },
       error: (err) => {
         console.error(err);
-        alert('Erro ao enviar. Tente novamente.');
+        alert('Erro ao enviar respostas. Tente novamente.');
       }
     });
   }

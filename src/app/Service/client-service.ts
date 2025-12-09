@@ -2,95 +2,106 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-// Definição das URLs
+// URL BASE
 const BASE_URL = 'http://localhost:8080';
-const API_URL = `${BASE_URL}/hospede`; 
+// Ajuste se no seu Controller estiver @RequestMapping("/hospedes") ou "/usuarios"
+const API_URL = `${BASE_URL}/hospedes`; 
 
-// --- Interfaces para o Formulário Público ---
+// --- Interfaces ---
+
 export interface FormQuestion {
   id: string;
   prompt: string;
-  type: 'STICKER' | 'SLIDER' | 'TEXT' | 'STARS';
+  type: string; // 'TEXT', 'STARS', etc.
   orderIndex: number;
   required: boolean;
 }
 
 export interface PublicForm {
+  id: number; // ID do questionário
   title: string;
   description?: string;
   questions: FormQuestion[];
 }
 
-export interface AnswerDto {
+// Interface para envio de resposta (Bate com RespostaModel/DTO do Java)
+export interface AnswerPayload {
+  guestId: string;
   questionId: string;
   value: string;
 }
 
-// --- Interface do Hóspede ---
 export interface Client {
   id?: string;
   name: string;
   email: string;
   phone: string;
   room: string;
-  checkin?: string;
-  checkout?: string;
   
-  // Link gerado pelo Java (para o botão Copiar)
+  // Nomes em CamelCase para bater com o Java novo
+  checkIn?: string; 
+  checkOut?: string;
+  emailSent?: boolean;
+
+  // Campos de visualização
   linkAcesso?: string;
-  
-  // ID do formulário atribuído (Vem do Java como número/Long)
-  assignedFormId?: number | null; 
+  assignedFormId?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
 export class ClientsService {
   private http = inject(HttpClient);
 
-  // --- MÉTODOS DE HÓSPEDES (CRUD) ---
+  // --- CRUD DE HÓSPEDES ---
 
-  // LISTAR
+  // LISTAR (GET /hospedes)
   list(): Observable<Client[]> {
-    return this.http.get<Client[]>(`${API_URL}/listar`);
+    return this.http.get<Client[]>(API_URL);
   }
 
-  // SALVAR / EDITAR
+  // CRIAR ou EDITAR
   upsert(client: Client): Observable<Client> {
-    // Se tiver ID, usa rota de edição
+    // Se tem ID, é Edição (PUT /hospedes/{id})
     if (client.id) {
-       return this.http.post<Client>(`${API_URL}/editar/${client.id}`, client);
+      return this.http.put<Client>(`${API_URL}/${client.id}`, client);
     }
-    return this.http.post<Client>(`${API_URL}/salvar`, client);
+    // Se não tem ID, é Criação (POST /hospedes)
+    return this.http.post<Client>(API_URL, client);
   }
 
-  // REMOVER
+  // REMOVER (DELETE /hospedes/{id})
   remove(id: string): Observable<any> {
-    return this.http.post(`${API_URL}/apagar/${id}`, {}, { responseType: 'text' });
+    // responseType: 'text' pois o Java pode retornar apenas uma String "Deletado"
+    return this.http.delete(`${API_URL}/${id}`, { responseType: 'text' });
   }
 
-  // --- LÓGICA DE ATRIBUIÇÃO ---
+  // --- ATRIBUIÇÃO DE FORMULÁRIO ---
 
-  // Atribui um formulário ao hóspede
-  assignToForm(clientId: string, templateId: string | number): Observable<void> {
-    // Chama a rota: PATCH /hospede/{id}/atribuir/{formId}
-    return this.http.patch<void>(`${API_URL}/${clientId}/atribuir/${templateId}`, {});
+  // Atribui: GET ou PUT no endpoint específico criado no Controller
+  // Exemplo: @GetMapping("/{id}/atribuir/{formId}") ou PUT
+  // Vou usar o padrão que definimos no Controller Java
+  assignToForm(clientId: string, formId: number): Observable<any> {
+     // Se no Java for void, use responseType: 'text'
+    return this.http.put(`${API_URL}/${clientId}/atribuir/${formId}`, {}, { responseType: 'text' });
   }
 
-  // Desvincula o formulário
-  unassignForm(clientId: string): Observable<void> {
-    return this.http.patch<void>(`${API_URL}/${clientId}/desatribuir`, {});
+  unassignForm(clientId: string): Observable<any> {
+    return this.http.put(`${API_URL}/${clientId}/desatribuir`, {}, { responseType: 'text' });
   }
 
-  // --- MÉTODOS DO FORMULÁRIO PÚBLICO (NOVO) ---
+  // --- FORMULÁRIO PÚBLICO (RESPONDER) ---
 
-  // 1. Busca as perguntas para o hóspede responder
+  // 1. Busca o questionário específico daquele hóspede
+  // Bate com: @GetMapping("/publico/{id}/questionario") no HospedeController
   getPublicForm(hospedeId: string): Observable<PublicForm> {
-    return this.http.get<PublicForm>(`${API_URL}/public/${hospedeId}`);
+    // Atenção à rota: /hospedes/publico/...
+    return this.http.get<PublicForm>(`${API_URL}/publico/${hospedeId}/questionario`);
   }
 
-  // 2. Envia as respostas para o backend
-  sendAnswers(hospedeId: string, answers: AnswerDto[]): Observable<any> {
-    // Nota: O controller de respostas fica em /respostas, não /hospede
-    return this.http.post(`${BASE_URL}/respostas/enviar/${hospedeId}`, answers);
+  // 2. Envia as respostas em Lote
+  // Bate com: @PostMapping("/respostas/lote") no RespostaController
+  // O payload já é uma lista de objetos { guestId, questionId, value }
+  sendAnswers(payload: AnswerPayload[]): Observable<string> {
+    return this.http.post(`${BASE_URL}/respostas/lote`, payload, { responseType: 'text' });
   }
 }

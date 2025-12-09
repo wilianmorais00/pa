@@ -63,8 +63,8 @@ export class ClientComponent {
       room: v.room,
       
       // Enviando as datas com a hora colada
-      checkin: checkinFormatado,
-      checkout: checkoutFormatado
+      checkIn: checkinFormatado,
+      checkOut: checkoutFormatado
     };
 
     console.log('Enviando JSON para o Java:', newClient); // <--- OLHE ISSO NO CONSOLE DO NAVEGADOR
